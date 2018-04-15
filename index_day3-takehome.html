@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Popular Repos</title>
+  <script crossorigin src="https://unpkg.com/react@16/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+  <script src='https://unpkg.com/babel-standalone@6/babel.min.js'></script>
+</head>
+<body>
+  <div id='app'></div>
+  <script>
+    window.API = {
+      fetchPopularRepos(language) {
+        // "language" can be "javascript", "ruby", "python", or "all"
+        const encodedURI = encodeURI(`https://api.github.com/search/repositories?q=stars:>1+language:${language}&sort=stars&order=desc&type=Repositories`)
+
+        return fetch(encodedURI)
+          .then((data) => data.json())
+          .then((repos) => repos.items)
+          .catch((error) => {
+            console.warn(error)
+            return null
+          });
+      }
+    }
+  </script>
+
+  <script type='text/babel'>
+    class Loading extends React.Component {
+      constructor(props) {
+        super(props);
+
+        this.state = {
+          text: 'Loading'
+        };
+      }
+      componentDidMount() {
+        const stopper = this.state.text + '...';
+
+        this.interval = window.setInterval(() => {
+          this.state.text === stopper
+            ? this.setState(() => ({ text: 'Loading' }))
+            : this.setState((prevState) => ({ text: prevState.text + '.' }))
+        }, 300)
+      }
+      componentWillUnmount() {
+        window.clearInterval(this.interval);
+      }
+      render() {
+        return (
+          <p>
+            {this.state.text}
+          </p>
+        )
+      }
+    }
+    
+    function RepoGrid({language, repos}) {
+      return (
+        <div>
+          <h2>{language}</h2>
+          
+          <ul>
+            {repos.map((repo) => (
+              <li key={repo.id}>
+                <p>
+                  <a href={repo.html_url} target="_blank">
+                    {repo.html_url}
+                  </a>
+                </p>
+                <p>@{repo.owner.login}</p>
+                <p>{repo.stargazers_count} stars</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )
+    }
+    
+    function Navigation({languages, onLanguageChange}) {
+      return (
+        <ul>
+          {languages.map((lang) => {
+            return <li
+                key={lang}
+                onClick={() => onLanguageChange(lang)}>
+                {lang}
+              </li>
+          })}
+        </ul>
+      )
+    }
+
+    class App extends React.Component {
+      constructor(props) {
+        super(props)
+        
+        this.state = {
+          language: 'all',
+          loading: true,
+          repos: []
+        }
+        
+        this.onLanguageChange = this.onLanguageChange.bind(this)
+      }
+      
+      componentDidMount() {
+        this.fetchRepos(this.state.language)
+      }
+      
+      componentDidUpdate(prevProps, prevState) {
+        if (prevState.language !== this.state.language) {
+          this.fetchRepos(this.state.language)
+        }
+      }
+      
+      onLanguageChange(language) {
+        this.setState({language})
+      }
+      
+      fetchRepos(language) {
+        this.setState({loading: true})
+        
+        API.fetchPopularRepos(language).then((repos) => {
+          this.setState({repos, loading: false})
+        })
+      }
+      
+      render() {
+        return (
+          <div>
+            <Navigation
+              languages={["all", "javascript", "ruby", "python"]}
+              onLanguageChange={this.onLanguageChange} />
+            
+            {this.state.loading && <Loading />}
+            {!this.state.loading &&
+              <RepoGrid
+                language={this.state.language}
+                repos={this.state.repos} />
+            }
+          </div>
+        )
+      }
+    }
+
+    ReactDOM.render(
+      <App />,
+      document.getElementById('app')
+    )
+  </script>
+</body>
+</html>
